@@ -1,7 +1,6 @@
 package app.components;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 public class SnakeObj {
@@ -22,5 +21,7 @@ public class SnakeObj {
         this.tailY = headY;
         this.secondLastTailX = headX;
         this.secondLastTailY = headY;
+
+        tiles.add(Global.GAME_TILES[headX][headY]);
     }
 }

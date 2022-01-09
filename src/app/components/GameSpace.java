@@ -3,7 +3,6 @@ package app.components;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.Random;
 
@@ -13,6 +12,8 @@ public class GameSpace extends JPanel {
     public enum Movement {
         UP, DOWN, LEFT, RIGHT;
     }
+
+    short score = 0;
 
     public GameSpace() {
         this.setLayout(new GridLayout(Global.gameSize, Global.gameSize));
@@ -52,22 +53,21 @@ public class GameSpace extends JPanel {
 
     private void fail() {
         System.out.println("Game Over!");
-        gameLoop.stop();
     }
 
     public static int[] mapMovementToArr(Movement m) {
         switch (m) {
             case UP: {
-                return new int[] {-1, 0};
+                return new int[]{-1, 0};
             }
             case LEFT: {
-                return new int[] {0, -1};
+                return new int[]{0, -1};
             }
             case DOWN: {
-                return new int[] {+1, 0};
+                return new int[]{+1, 0};
             }
             case RIGHT: {
-                return new int[] {0, +1};
+                return new int[]{0, +1};
             }
         }
         throw new IllegalStateException("this should never be thrown");
@@ -77,37 +77,50 @@ public class GameSpace extends JPanel {
 
     Timer gameLoop = new Timer(150, (t) -> {
         if (Global.nextMovement != null) {
-            System.out.println(Global.nextMovement);
             int[] planned = mapMovementToArr(Global.nextMovement);
             int newX = Global.snakeObj.headX + planned[0], newY = Global.snakeObj.headY + planned[1];
 
-            SnakeTile collision = Global.GAME_TILES[newX][newY];
-
-            boolean preserveTail = collision.isApple();
-
-            Global.GAME_TILES[Global.snakeObj.tailX][Global.snakeObj.tailY].setSnake(preserveTail); // true if hits apple; else, false.
-
-            Global.snakeObj.secondLastTailX = Global.snakeObj.headX;
-            Global.snakeObj.secondLastTailY = Global.snakeObj.headY;
-
-            Global.snakeObj.headX = newX;
-            Global.snakeObj.headY = newY;
-
-
-
-            if (collision.isApple()) {
-                putApple();
+            if (newX < 0 || newX >= Global.gameSize || newY < 0 || newY >= Global.gameSize) {
+                fail();
+                ((Timer) t.getSource()).stop();
             } else {
-                Global.snakeObj.tailY = Global.snakeObj.secondLastTailY;
-                Global.snakeObj.tailX = Global.snakeObj.secondLastTailX;
+                SnakeTile collision = Global.GAME_TILES[newX][newY];
+
+                Global.snakeObj.secondLastTailX = Global.snakeObj.headX;
+                Global.snakeObj.secondLastTailY = Global.snakeObj.headY;
+
+                Global.snakeObj.headX = newX;
+                Global.snakeObj.headY = newY;
+
+                Global.snakeObj.tiles.add(Global.GAME_TILES[newX][newY]);
+
+                if (collision.isApple()) {
+                    Global.GAME_TILES[newX][newY].setApple(false);
+                    putApple();
+                    score++;
+                } else {
+                    Global.snakeObj.tailY = Global.snakeObj.secondLastTailY;
+                    Global.snakeObj.tailX = Global.snakeObj.secondLastTailX;
+                    if (Global.snakeObj.tiles.get(0) != null) {
+                        Global.snakeObj.tiles.get(0).setSnake(false);
+                        Global.snakeObj.tiles.get(0).setHead(false);
+                    }
+                    Global.snakeObj.tiles.remove(0);
+                }
+
+                if (collision.isSnake()) {
+                    fail();
+                    ((Timer) t.getSource()).stop();
+                } else {
+                    for (SnakeTile tile : Global.snakeObj.tiles) {
+                        tile.setSnake(true);
+                        tile.setHead(false);
+                    }
+                    Global.snakeObj.tiles.get(score).setHead(true);
+                }
+
+                GameSpace.this.repaint();
             }
-
-            if (collision.isSnake()) fail();
-
-            Global.GAME_TILES[newX][newY].setSnake(true);
-
-            GameSpace.this.repaint();
-//            incrementSnake(Global.snakeObj);
         } else {
             if (!hasApple) {
                 putApple();
@@ -129,25 +142,15 @@ public class GameSpace extends JPanel {
         Global.gameSpace.repaint();
     }
 
-    public static void incrementSnake(SnakeObj snake) {
-        Movement m = Global.nextMovement;
-        int[] applied = mapMovementToArr(m);
-        System.out.println(Arrays.toString(applied));
-        snake.headX += applied[0];
-        snake.headY += applied[1];
-    }
-
+    /*
+    Static Initializer for now; fixme later.
+     */
     {
         gameLoop.start();
         handleKeyPresses(new SnakeEvents() {
             @Override
             void onMovementKeyPress(KeyEvent e) {
-                Movement nextMove = mapKeyEventToMovement(e);
-
-                System.out.println(nextMove);
-
-                Global.nextMovement = nextMove;
-
+                Global.nextMovement = mapKeyEventToMovement(e);
             }
 
             @Override
@@ -158,7 +161,8 @@ public class GameSpace extends JPanel {
     }
 
     public static boolean isMovementKey(KeyEvent e) {
-        return String.valueOf(ApplicationWindow.supplyOnNullPredicate(e, KeyEvent::getKeyChar, () -> (char) 0)).matches("^[wWaAsSdD]$");
+        return String.valueOf(ApplicationWindow
+                .supplyOnNullPredicate(e, KeyEvent::getKeyChar, () -> (char) 0)).matches("^[wWaAsSdD]$");
     }
 
     public void handleKeyPresses(SnakeEvents config) {
